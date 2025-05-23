@@ -31,7 +31,7 @@ export default function DashboardLayout() {
 
           <div className="bg-white p-4 rounded-lg shadow">
             <h3 className="font-semibold text-lg mb-2">Weekly Digest Preview</h3>
-            <p className="text-gray-500">This week's summary ready to email or review...</p>
+            <p className="text-gray-500">This week&rsquo;s summary ready to email or review...</p>
           </div>
         </section>
       </main>
