@@ -23,16 +23,18 @@ Summarize the following Slack conversation:
 ${messages.map(m => `- ${m.user}: ${m.text}`).join('\n')}
 `;
 
-  const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + process.env.GEMINI_API_KEY, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    }),
-  });
+const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + process.env.GEMINI_API_KEY, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }]
+  }),
+});
 
-  const result = await geminiResponse.json();
-  const summary = result?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No summary available.';
+const result = await geminiResponse.json();
+console.log('Gemini raw response:', JSON.stringify(result, null, 2));
+
+const summary = result?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No summary available.';
 
   return NextResponse.json({ summary });
 }
