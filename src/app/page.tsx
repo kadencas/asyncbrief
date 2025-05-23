@@ -1,4 +1,21 @@
+import { useEffect, useState } from 'react';
+
+interface SlackMessage {
+  text: string;
+  user: string;
+  ts: string;
+}
+
 export default function DashboardLayout() {
+  const [messages, setMessages] = useState<SlackMessage[]>([]);
+
+  useEffect(() => {
+    // Fetch real messages from Supabase-connected API
+    fetch('/api/slack/messages')
+      .then((res) => res.json())
+      .then(setMessages);
+  }, []);
+
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
@@ -19,19 +36,17 @@ export default function DashboardLayout() {
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold text-lg mb-2">Slack Summary</h3>
-            <p className="text-gray-500">Top threads, key decisions, open questions...</p>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold text-lg mb-2">GitHub PRs & Issues</h3>
-            <p className="text-gray-500">Recent activity, stale PRs, open issues...</p>
-          </div>
-
-          <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold text-lg mb-2">Weekly Digest Preview</h3>
-            <p className="text-gray-500">This week&rsquo;s summary ready to email or review...</p>
+          <div className="bg-white p-4 rounded-lg shadow col-span-3">
+            <h3 className="font-semibold text-lg mb-2">Recent Slack Messages</h3>
+            <ul className="space-y-2 max-h-80 overflow-y-auto">
+              {messages.length === 0 && <p className="text-gray-400">No messages yet.</p>}
+              {messages.map((msg, idx) => (
+                <li key={idx} className="border-b pb-2">
+                  <span className="block text-sm text-gray-800">{msg.text}</span>
+                  <span className="block text-xs text-gray-500">User: {msg.user} • Time: {new Date(parseFloat(msg.ts) * 1000).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       </main>

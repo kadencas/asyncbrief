@@ -1,4 +1,10 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -10,9 +16,11 @@ export async function POST(req: NextRequest) {
 
   // Handle message events
   if (body.event?.type === 'message') {
-    console.log('New message event:', body.event);
+    const { text, user, ts, channel } = body.event;
 
-    // Save to database or forward to AI summarizer here
+    await supabase.from('slack_messages').insert([
+      { text, user, ts, channel }
+    ]);
   }
 
   return NextResponse.json({ ok: true });
