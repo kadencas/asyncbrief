@@ -10,13 +10,6 @@ interface SlackMessage {
 
 export default function DashboardLayout() {
   const [messages, setMessages] = useState<SlackMessage[]>([]);
-  const [summary, setSummary] = useState('');
-
-  useEffect(() => {
-    fetch('/api/slack/summary')
-      .then(res => res.json())
-      .then(data => setSummary(data.summary));
-  }, []);
 
   useEffect(() => {
     // Fetch real messages from Supabase-connected API
@@ -43,11 +36,6 @@ export default function DashboardLayout() {
         <header className="mb-6">
           <h2 className="text-3xl font-semibold">Dashboard Overview</h2>
         </header>
-
-        <div className="bg-blue-50 p-4 rounded-lg shadow col-span-3 mb-6">
-          <h3 className="font-semibold text-lg mb-2">Summary</h3>
-          <p className="text-gray-700">{summary || 'Loading summary...'}</p>
-        </div>
 
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           <div className="bg-white p-4 rounded-lg shadow col-span-3">
