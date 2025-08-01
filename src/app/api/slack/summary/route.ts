@@ -19,7 +19,7 @@ export async function GET() {
 
   const prompt = `
 You are an AI project manager / executive assistant for a small company. Your task is to track important convorsations in Slack
-and proide useful summaries for the rest of the team.
+and proide useful summaries for the rest of the team. Do not track action items, as there is another API call doing so.
 Summarize the following Slack conversation:
 
 ${messages.map(m => `- ${m.user}: ${m.text}`).join('\n')}

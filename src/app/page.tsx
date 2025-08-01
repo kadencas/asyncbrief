@@ -1,183 +1,222 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-// Define our data structures
-interface SlackMessage {
-  text: string;
-  user: string;
-  ts: string;
-}
+// --- Type Definitions ---
+type SlackMessage = { text: string; user: string; ts: string };
+type ActionItem = { task: string; suggestedOwner: string | null };
+type Sentiment = { score: number; summary:string };
+type FlaggedMessage = { ts: string; reason: string }; // For miscommunications
 
-interface ActionItem {
-  task: string;
-  suggestedOwner: string | null;
-}
+const NAV = ["Dashboard", "Settings"];
 
-interface Sentiment {
-  score: number;
-  summary: string;
-}
+const formatTime = (ts: string) => new Date(parseFloat(ts) * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-// Helper function to get an emoji based on sentiment score
-const getSentimentEmoji = (score: number) => {
-  if (score >= 8) return '😄';
-  if (score >= 6) return '🙂';
-  if (score >= 4) return '😐';
-  return '😟';
-};
+const getEmoji = (score: number) =>
+  score >= 8 ? "😄" : score >= 6 ? "🙂" : score >= 4 ? "😐" : "😟";
 
-export default function DashboardLayout() {
+// --- Custom Hook for Data Fetching ---
+function useSlackAnalysis() {
   const [messages, setMessages] = useState<SlackMessage[]>([]);
-  const [summary, setSummary] = useState<string>('');
+  const [summary, setSummary] = useState<string>("");
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [sentiment, setSentiment] = useState<Sentiment | null>(null);
-  const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
-  const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [lastUpdated, setLastUpdated] = useState<string>("");
+  
+  // --- START: Added state for miscommunications ---
+  const [miscommunications, setMiscommunications] = useState<Map<string, string>>(new Map());
+  // --- END: Added state for miscommunications ---
 
-  const handleCheckboxChange = (index: number) => {
-    const newCheckedItems = new Set(checkedItems);
-    if (newCheckedItems.has(index)) newCheckedItems.delete(index);
-    else newCheckedItems.add(index);
-    setCheckedItems(newCheckedItems);
-  };
+  const fetchAll = useCallback(async () => {
+    try {
+      // --- START: Added miscommunications endpoint to fetch ---
+      const [msgsRes, summaryRes, itemsRes, sentimentRes, miscommsRes] = await Promise.all([
+        fetch("/api/slack/messages"),
+        fetch("/api/slack/summary"),
+        fetch("/api/slack/actionItems"),
+        fetch("/api/slack/sentiment"),
+        fetch("/api/slack/miscommunications"),
+      ]);
+      // --- END: Added miscommunications endpoint to fetch ---
 
-  const fetchAnalysisData = () => {
-    // Fetch summary
-    fetch('/api/slack/summary')
-      .then((res) => res.json())
-      .then((data) => {
-        setSummary(data.summary || 'No summary available.');
-        setLastUpdated(new Date().toLocaleString());
-      });
+      // Process all responses
+      const msgs = await msgsRes.json();
+      setMessages(msgs || []);
+      const summaryData = await summaryRes.json();
+      setSummary(summaryData.summary || "No summary available.");
+      const aiItems = await itemsRes.json();
+      setActionItems(aiItems.actionItems || []);
+      const sentimentData = await sentimentRes.json();
+      setSentiment(sentimentData.sentiment || null);
+      setLastUpdated(new Date().toLocaleString());
 
-    // Fetch action items with owners
-    fetch('/api/slack/actionItems')
-      .then((res) => res.json())
-      .then((data) => {
-        setActionItems(data.actionItems || []);
-        setCheckedItems(new Set());
-      });
-      
-    // Fetch sentiment analysis
-    fetch('/api/slack/sentiment')
-      .then((res) => res.json())
-      .then((data) => {
-        setSentiment(data.sentiment || null);
-      });
-  };
+      // --- START: Process and store miscommunication data ---
+      const miscommsData = await miscommsRes.json();
+      const flaggedMap = new Map<string, string>();
+      if (miscommsData.flaggedMessages) {
+        miscommsData.flaggedMessages.forEach((msg: FlaggedMessage) => {
+          flaggedMap.set(msg.ts, msg.reason);
+        });
+      }
+      setMiscommunications(flaggedMap);
+      // --- END: Process and store miscommunication data ---
 
-  useEffect(() => {
-    fetch('/api/slack/messages')
-      .then((res) => res.json())
-      .then(setMessages);
-    fetchAnalysisData();
+    } catch (e) {
+      console.error("Fetch error", e);
+    }
   }, []);
 
-  const regenerateAnalysis = () => {
-    fetchAnalysisData();
-  };
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  // --- START: Added miscommunications to return object ---
+  return { messages, summary, actionItems, sentiment, miscommunications, lastUpdated, refresh: fetchAll };
+  // --- END: Added miscommunications to return object ---
+}
+
+
+// --- Main Dashboard Component ---
+export default function DashboardLayout() {
+  const { messages, summary, actionItems, sentiment, miscommunications, lastUpdated, refresh } =
+    useSlackAnalysis();
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+
+  const toggle = (i: number) =>
+    setChecked((prev) => {
+      const s = new Set(prev);
+      s.has(i) ? s.delete(i) : s.add(i);
+      return s;
+    });
 
   return (
-    <div className="flex h-screen">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 text-white p-4 space-y-6">
-        <h1 className="text-2xl font-bold">AsyncBrief</h1>
-        <nav className="space-y-2">
-          <a href="#" className="block text-gray-300 hover:text-white">Dashboard</a>
-          <a href="#" className="block text-gray-300 hover:text-white">Slack</a>
-          <a href="#" className="block text-gray-300 hover:text-white">GitHub</a>
-          <a href="#" className="block text-gray-300 hover:text-white">Settings</a>
-        </nav>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 bg-gray-100 p-6 overflow-y-scroll">
-        <header className="mb-6">
-          <h2 className="text-3xl font-semibold">Dashboard Overview</h2>
-        </header>
-
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {/* Recent Messages Card */}
-          <Card className="col-span-3">
-            <CardHeader><CardTitle>Recent Slack Messages</CardTitle></CardHeader>
-            <CardContent>
-              <ScrollArea className="h-80 w-full pr-4">
-                {messages.map((msg, idx) => (
-                  <li key={idx} className="list-none border-b pb-2 mb-2">
-                    <span className="block text-sm text-gray-800">{msg.text}</span>
-                    <span className="block text-xs text-gray-500">
-                      User: {msg.user} • Time: {new Date(parseFloat(msg.ts) * 1000).toLocaleString()}
-                    </span>
-                  </li>
-                ))}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          {/* AI Digest Card */}
-          <Card className="col-span-3 xl:col-span-2">
-            <CardHeader><CardTitle>AI-Powered Digest</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">{summary}</p>
-              <p className="text-xs text-gray-500 mt-2">Last updated: {lastUpdated}</p>
-              <Button onClick={regenerateAnalysis} className="mt-4">Regenerate Analysis</Button>
-            </CardContent>
-          </Card>
-          
-          {/* Container for the right-hand column cards */}
-          <div className="col-span-3 xl:col-span-1 space-y-6">
-            {/* Sentiment Card (New) */}
-            <Card>
-              <CardHeader><CardTitle>Sentiment Check</CardTitle></CardHeader>
-              <CardContent>
-                {sentiment ? (
-                  <div className="flex items-center space-x-4">
-                    <span className="text-4xl">{getSentimentEmoji(sentiment.score)}</span>
-                    <div>
-                      <p className="font-bold text-lg">{sentiment.score}/10</p>
-                      <p className="text-sm text-gray-600">{sentiment.summary}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No sentiment analysis available.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Action Items Card (Modified) */}
-            <Card>
-              <CardHeader><CardTitle>Action Items 📝</CardTitle></CardHeader>
-              <CardContent>
-                {actionItems.length > 0 ? (
-                  <div className="space-y-4">
-                    {actionItems.map((item, idx) => (
-                      <div key={idx} className="border-b pb-2 last:border-b-0">
-                        <div className="flex items-start space-x-3">
-                          <Checkbox id={`action-${idx}`} checked={checkedItems.has(idx)} onCheckedChange={() => handleCheckboxChange(idx)} className="mt-1"/>
-                          <Label htmlFor={`action-${idx}`} className={`text-sm leading-tight ${checkedItems.has(idx) ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                            {item.task}
-                          </Label>
-                        </div>
-                        <div className="pl-7 pt-1 text-xs text-gray-500 font-medium">
-                          👤 Owner: {item.suggestedOwner || 'Unassigned'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-500">No action items identified.</p>
-                )}
-              </CardContent>
-            </Card>
+    <TooltipProvider> {/* Required for Tooltips to work */}
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-56 bg-gray-900 text-white p-4 flex-shrink-0">
+          <div className="mb-4">
+            <h1 className="text-xl font-semibold">AsyncBrief</h1>
           </div>
-        </section>
-      </main>
-    </div>
+          <nav className="flex flex-col gap-2 text-sm">
+            {NAV.map((n) => (
+              <a key={n} href="#" className="truncate text-gray-300 hover:text-white">{n}</a>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Main */}
+        <main className="flex-1 bg-gray-50 p-4 overflow-y-auto">
+          {/* Top bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-2xl font-medium">Overview</h2>
+              {lastUpdated && (<p className="text-xs text-gray-600">Last updated: {lastUpdated}</p>)}
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={refresh}>Refresh</Button>
+            </div>
+          </div>
+
+          {/* Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left / wider column */}
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              <Card>
+                <CardHeader><CardTitle className="text-base">Digest</CardTitle></CardHeader>
+                <CardContent><p className="text-sm whitespace-pre-wrap">{summary}</p></CardContent>
+              </Card>
+
+              {/* --- START: Modified "Recent Slack" Card --- */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Recent Slack</CardTitle></CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-64">
+                    <ul className="divide-y">
+                      {messages.map((m) => {
+                        const reason = miscommunications.get(m.ts);
+                        return (
+                          <Tooltip key={m.ts} delayDuration={100}>
+                            <TooltipTrigger asChild>
+                              <li className={`py-2 px-3 transition-colors ${
+                                reason ? 'bg-amber-100 border-l-4 border-amber-400' : ''
+                              }`}>
+                                <div className="text-sm">{m.text}</div>
+                                <div className="text-xs text-gray-500 flex justify-between mt-1">
+                                  <span>{m.user}</span>
+                                  <span>{formatTime(m.ts)}</span>
+                                </div>
+                              </li>
+                            </TooltipTrigger>
+                            {reason && (
+                              <TooltipContent>
+                                <p className="max-w-xs">💡 AI Suggestion: {reason}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        );
+                      })}
+                    </ul>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+              {/* --- END: Modified "Recent Slack" Card --- */}
+            </div>
+
+            {/* Right / compact column */}
+            <div className="flex flex-col gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center justify-between">
+                    Project {sentiment && <span className="ml-1">{getEmoji(sentiment.score)}</span>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  {sentiment ? (
+                    <>
+                      <div className="text-sm font-medium">{sentiment.score}/10</div>
+                      <div className="text-xs text-gray-600">{sentiment.summary}</div>
+                    </>
+                  ) : (<div className="text-xs text-gray-500">No sentiment data.</div>)}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Action Items</CardTitle></CardHeader>
+                <CardContent className="p-2">
+                  {actionItems.length ? (
+                    <div className="space-y-2">
+                      {actionItems.map((it, i) => (
+                        <div key={i} className="flex items-start gap-2 text-sm">
+                          <Checkbox id={`ai-${i}`} checked={checked.has(i)} onCheckedChange={() => toggle(i)}/>
+                          <div className="flex-1">
+                            <div className={`${checked.has(i) ? "line-through text-gray-400" : "text-gray-800"}`}>
+                              {it.task}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {it.suggestedOwner ? `Owner: ${it.suggestedOwner}` : "Unassigned"}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (<div className="text-xs text-gray-500">No action items.</div>)}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }
