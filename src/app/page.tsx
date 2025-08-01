@@ -12,9 +12,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/toaster";
-import { useToast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
 
 // --- Type Definitions ---
 type SlackMessage = { text: string; user: string; ts: string };
@@ -23,8 +20,11 @@ type Sentiment = { score: number; summary: string };
 type FlaggedMessage = { ts: string; reason: string };
 
 const formatTime = (ts: string) => new Date(parseFloat(ts) * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-const getEmoji = (score: number) => score >= 8 ? "😄" : score >= 6 ? "🙂" : score >= 4 ? "😐" : "😟";
 
+const getEmoji = (score: number) =>
+  score >= 8 ? "😄" : score >= 6 ? "🙂" : score >= 4 ? "😐" : "😟";
+
+// --- Custom Hook for Data Fetching ---
 function useSlackAnalysis() {
   const [messages, setMessages] = useState<SlackMessage[]>([]);
   const [summary, setSummary] = useState<string>("");
@@ -77,30 +77,31 @@ function useSlackAnalysis() {
   return { messages, summary, actionItems, sentiment, miscommunications, isLoading, lastUpdated, refresh: fetchAll };
 }
 
+// --- Main App Component ---
 export default function App() {
-  const [page, setPage] = useState('dashboard');
-
   return (
-    <>
-      <TooltipProvider>
-        <div className="flex h-screen overflow-hidden">
-          <aside className="w-56 bg-gray-900 text-white p-4 flex-shrink-0">
-            <div className="mb-4"><h1 className="text-xl font-semibold">AsyncBrief</h1></div>
-            <nav className="flex flex-col gap-2 text-sm">
-              <a href="#" onClick={() => setPage('dashboard')} className={`truncate p-2 rounded ${page === 'dashboard' ? 'bg-gray-700' : 'text-gray-300'} hover:bg-gray-700 hover:text-white`}>Dashboard</a>
-              <a href="#" onClick={() => setPage('settings')} className={`truncate p-2 rounded ${page === 'settings' ? 'bg-gray-700' : 'text-gray-300'} hover:bg-gray-700 hover:text-white`}>Settings</a>
-            </nav>
-          </aside>
-          <main className="flex-1 bg-gray-50 p-4 overflow-y-auto">
-            {page === 'dashboard' ? <DashboardPage /> : <SettingsPage />}
-          </main>
-        </div>
-      </TooltipProvider>
-      <Toaster />
-    </>
+    <TooltipProvider>
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-56 bg-gray-900 text-white p-4 flex-shrink-0">
+          <div className="mb-4">
+            <h1 className="text-xl font-semibold">AsyncBrief</h1>
+          </div>
+          <nav className="flex flex-col gap-2 text-sm">
+            <a href="#" className="truncate p-2 rounded bg-gray-700 text-white">Dashboard</a>
+          </nav>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 bg-gray-50 p-4 overflow-y-auto">
+          <DashboardPage />
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }
 
+// --- Dashboard Page Component ---
 function DashboardPage() {
   const { messages, summary, actionItems, sentiment, miscommunications, isLoading, lastUpdated, refresh } = useSlackAnalysis();
   const [checked, setChecked] = useState<Set<number>>(new Set());
@@ -129,6 +130,7 @@ function DashboardPage() {
       
       {isLoading ? <p>Loading analysis...</p> : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Left / wider column */}
           <div className="lg:col-span-2 flex flex-col gap-4">
             <Card>
               <CardHeader><CardTitle className="text-base">Digest</CardTitle></CardHeader>
@@ -163,6 +165,7 @@ function DashboardPage() {
             </Card>
           </div>
 
+          {/* Right / compact column */}
           <div className="flex flex-col gap-4">
             <Card>
               <CardHeader><CardTitle className="text-base flex items-center justify-between">Sentiment {sentiment && <span className="ml-1">{getEmoji(sentiment.score)}</span>}</CardTitle></CardHeader>
@@ -198,75 +201,5 @@ function DashboardPage() {
         </div>
       )}
     </>
-  );
-}
-
-const DEFAULT_PROMPTS = {
-  summary: `You are an AI project manager. Summarize the key topics, decisions, and outcomes from the following Slack conversation. Be concise and clear.`,
-  actionItems: `You are a project manager's assistant. Analyze the conversation and extract action items. Respond with a JSON object with an "actionItems" key, containing an array of objects. Each object needs a "task" and a "suggestedOwner". If no owner is clear, it should be null.`,
-  sentiment: `Analyze the conversation's sentiment. Respond with a JSON object with a "sentiment" key, containing an object with a "score" (1-10) and a "summary" (one sentence).`,
-  miscommunications: `You are a communication analyst. Identify messages that are ambiguous, have unanswered questions, or could lead to miscommunication. Respond with a JSON object with a "flaggedMessages" key, containing an array of objects with the message "ts" and a "reason".`
-};
-type PromptKeys = keyof typeof DEFAULT_PROMPTS;
-
-function SettingsPage() {
-  const [prompts, setPrompts] = useState(DEFAULT_PROMPTS);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // This object now has a specific type, fixing the 'any' error.
-    const loadedPrompts: { [key: string]: string } = {};
-    for (const key in DEFAULT_PROMPTS) {
-      if (Object.prototype.hasOwnProperty.call(DEFAULT_PROMPTS, key)) {
-        const saved = localStorage.getItem(`prompt_${key}`);
-        loadedPrompts[key] = saved || DEFAULT_PROMPTS[key as PromptKeys];
-      }
-    }
-    setPrompts(loadedPrompts as typeof DEFAULT_PROMPTS);
-  }, []);
-
-  const handleSave = () => {
-    Object.entries(prompts).forEach(([key, value]) => {
-      localStorage.setItem(`prompt_${key}`, value);
-    });
-    toast({
-      title: "Prompts Saved!",
-      description: "Your custom instructions will be used on the next refresh.",
-    });
-  };
-
-  const handleReset = (key: PromptKeys) => {
-    setPrompts(prev => ({ ...prev, [key]: DEFAULT_PROMPTS[key] }));
-  };
-
-  const handlePromptChange = (key: PromptKeys, value: string) => {
-    setPrompts(prev => ({ ...prev, [key]: value }));
-  };
-
-  return (
-    <div>
-      <div className="mb-4">
-        <h2 className="text-2xl font-medium">Settings</h2>
-        <p className="text-sm text-gray-600">Customize the instructions given to the AI for each feature.</p>
-      </div>
-      <div className="space-y-6">
-        {Object.entries(prompts).map(([key, value]) => (
-          <Card key={key}>
-            <CardHeader><CardTitle className="capitalize">{key.replace(/([A-Z])/g, ' $1')} Prompt</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <Label htmlFor={`prompt-${key}`}>AI Instructions</Label>
-              <Textarea
-                id={`prompt-${key}`}
-                value={value}
-                onChange={(e) => handlePromptChange(key as PromptKeys, e.target.value)}
-                className="min-h-[120px] text-sm font-mono"
-              />
-              <Button variant="outline" size="sm" onClick={() => handleReset(key as PromptKeys)}>Reset to Default</Button>
-            </CardContent>
-          </Card>
-        ))}
-        <Button onClick={handleSave} size="lg">Save All Prompts</Button>
-      </div>
-    </div>
   );
 }
