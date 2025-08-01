@@ -18,12 +18,17 @@ export async function GET() {
   }
 
   const prompt = `
+You are an AI project manager / executive assistant for a small company. Your task is to track important convorsations in Slack
+and proide useful summaries for the rest of the team.
 Summarize the following Slack conversation:
 
 ${messages.map(m => `- ${m.user}: ${m.text}`).join('\n')}
 `;
 
-const geminiResponse = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent' + process.env.GEMINI_API_KEY, {
+const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`
+
+
+, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({

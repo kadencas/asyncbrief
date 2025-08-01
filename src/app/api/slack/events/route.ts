@@ -1,3 +1,7 @@
+/**
+ * This file recieves data from slack and stores it in supabase.
+ */
+
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
