@@ -1,9 +1,9 @@
-// src/hooks/use-toast.ts
-
 import * as React from 'react';
-import type { Toast } from '@/components/ui/toast';
+// --- CORRECTED IMPORT ---
+import { type ToastProps } from "@/components/ui/toast";
 
-type ToasterToast = Toast & {
+// --- CORRECTED TYPE DEFINITION ---
+type ToasterToast = ToastProps & {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
