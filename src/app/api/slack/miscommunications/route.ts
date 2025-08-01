@@ -8,12 +8,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Define the structure of our response
-interface FlaggedMessage {
-  ts: string;  // The unique timestamp of the message to identify it
-  reason: string; // The explanation for why it was flagged
-}
-
 export async function GET() {
   const { data: messages, error } = await supabase
     .from('slack_messages')

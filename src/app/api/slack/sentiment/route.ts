@@ -61,7 +61,7 @@ ${messages.map(m => m.text).join('\n')}
     const sentimentData = JSON.parse(rawText);
     return NextResponse.json({ sentiment: sentimentData });
 
-  } catch (e) {
+  } catch (error) {
     return NextResponse.json({ error: 'Failed to analyze sentiment' }, { status: 500 });
   }
 }

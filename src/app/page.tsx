@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
@@ -17,7 +16,7 @@ import {
 type SlackMessage = { text: string; user: string; ts: string };
 type ActionItem = { task: string; suggestedOwner: string | null };
 type Sentiment = { score: number; summary:string };
-type FlaggedMessage = { ts: string; reason: string }; // For miscommunications
+type FlaggedMessage = { ts: string; reason: string };
 
 const NAV = ["Dashboard", "Settings"];
 
