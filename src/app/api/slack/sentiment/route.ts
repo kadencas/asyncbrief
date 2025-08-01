@@ -4,22 +4,22 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 export async function GET() {
-  const { data: messages, error } = await supabase
-    .from('slack_messages')
-    .select('text')
-    .order('ts', { ascending: true })
-    .limit(50);
+    const { data: messages, error } = await supabase
+        .from('slack_messages')
+        .select('text')
+        .order('ts', { ascending: true })
+        .limit(50);
 
-  if (error || !messages) {
-    return NextResponse.json({ error: 'Could not fetch messages' }, { status: 500 });
-  }
+    if (error || !messages) {
+        return NextResponse.json({ error: 'Could not fetch messages' }, { status: 500 });
+    }
 
-  const prompt = `
+    const prompt = `
 You are a communication analyst AI. Analyze the overall sentiment of the following conversation.
 
 Provide a response as a valid JSON object with two keys:
@@ -32,36 +32,37 @@ Conversation to analyze:
 ${messages.map(m => m.text).join('\n')}
 `;
 
-  try {
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            response_mime_type: "application/json",
-          }
-        }),
-      }
-    );
+    try {
+        const geminiResponse = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        response_mime_type: "application/json",
+                    }
+                }),
+            }
+        );
 
-    if (!geminiResponse.ok) {
-      throw new Error(`Gemini API responded with status ${geminiResponse.status}`);
+        if (!geminiResponse.ok) {
+            throw new Error(`Gemini API responded with status ${geminiResponse.status}`);
+        }
+
+        const result = await geminiResponse.json();
+        const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!rawText) {
+            return NextResponse.json({ sentiment: null });
+        }
+
+        const sentimentData = JSON.parse(rawText);
+        return NextResponse.json({ sentiment: sentimentData });
+
+    } catch {
+        console.error("Failed to analyze sentiment.");
+        return NextResponse.json({ error: 'Failed to analyze sentiment' }, { status: 500 });
     }
-
-    const result = await geminiResponse.json();
-    const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) {
-      return NextResponse.json({ sentiment: null });
-    }
-    
-    const sentimentData = JSON.parse(rawText);
-    return NextResponse.json({ sentiment: sentimentData });
-
-  } catch (_error) {
-    return NextResponse.json({ error: 'Failed to analyze sentiment' }, { status: 500 });
-  }
 }

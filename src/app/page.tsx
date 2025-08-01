@@ -108,7 +108,11 @@ function DashboardPage() {
   const toggle = (i: number) => {
     setChecked((prev) => {
       const s = new Set(prev);
-      s.has(i) ? s.delete(i) : s.add(i);
+      if (s.has(i)) {
+        s.delete(i);
+      } else {
+        s.add(i);
+      }
       return s;
     });
   };
@@ -198,10 +202,10 @@ function DashboardPage() {
 }
 
 const DEFAULT_PROMPTS = {
-  summary: `You are an AI project manager...`, // Truncated for brevity
-  actionItems: `You are a project manager's assistant...`,
-  sentiment: `Analyze the conversation's sentiment...`,
-  miscommunications: `You are a communication analyst...`
+  summary: `You are an AI project manager. Summarize the key topics, decisions, and outcomes from the following Slack conversation. Be concise and clear.`,
+  actionItems: `You are a project manager's assistant. Analyze the conversation and extract action items. Respond with a JSON object with an "actionItems" key, containing an array of objects. Each object needs a "task" and a "suggestedOwner". If no owner is clear, it should be null.`,
+  sentiment: `Analyze the conversation's sentiment. Respond with a JSON object with a "sentiment" key, containing an object with a "score" (1-10) and a "summary" (one sentence).`,
+  miscommunications: `You are a communication analyst. Identify messages that are ambiguous, have unanswered questions, or could lead to miscommunication. Respond with a JSON object with a "flaggedMessages" key, containing an array of objects with the message "ts" and a "reason".`
 };
 type PromptKeys = keyof typeof DEFAULT_PROMPTS;
 
@@ -210,14 +214,15 @@ function SettingsPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadedPrompts: any = {};
+    // This object now has a specific type, fixing the 'any' error.
+    const loadedPrompts: { [key: string]: string } = {};
     for (const key in DEFAULT_PROMPTS) {
       if (Object.prototype.hasOwnProperty.call(DEFAULT_PROMPTS, key)) {
         const saved = localStorage.getItem(`prompt_${key}`);
-        loadedPrompts[key as PromptKeys] = saved || DEFAULT_PROMPTS[key as PromptKeys];
+        loadedPrompts[key] = saved || DEFAULT_PROMPTS[key as PromptKeys];
       }
     }
-    setPrompts(loadedPrompts);
+    setPrompts(loadedPrompts as typeof DEFAULT_PROMPTS);
   }, []);
 
   const handleSave = () => {
