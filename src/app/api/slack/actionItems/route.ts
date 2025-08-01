@@ -68,7 +68,7 @@ ${messages.map(m => `${m.user}: ${m.text}`).join('\n')}
     const actionItemsData = JSON.parse(rawText);
     return NextResponse.json(actionItemsData);
 
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Failed to generate action items' }, { status: 500 });
   }
 }
