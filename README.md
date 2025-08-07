@@ -7,6 +7,6 @@ the application is now more interactive and will continue to become even more in
 
 We are aiming to add:
 
-auto-generated timeline
-more robust action items list that persist in database
+auto-generated timeline, 
+more robust action items list that persist in database, 
 fine tuning the AI thru the front end
